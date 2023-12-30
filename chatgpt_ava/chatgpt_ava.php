@@ -551,8 +551,10 @@ function chatgpt_ava_private_rewrite()
         // Check if the post title is empty
         //
         // if (empty($post->post_title)) { << not working 
-        if (strlen($post->post_title) < 3 || strlen($post->post_title) > 68) {
-            error_log('~-~ regenerate_post_title() return false short < or > long'."\n", 3, CUSTOM_LOG_PATH);
+        if (strlen($post->post_title) < 3 ) { // || strlen($post->post_title) > 48
+            // future edit, it may need adding try again so short titles will be retried and good to pass seo
+            // ++ that error when happen false, the post didn't delete and count with delete_draft posts cron ...
+            error_log('~-~ regenerate_post_title() return false short'."\n", 3, CUSTOM_LOG_PATH); //  < or > long
             return false; // Return zero if title is empty
         }
         
@@ -938,7 +940,7 @@ function chatgpt_ava_private_rewrite()
 
                 // title regenerate content
                 $title = $post->post_title;
-                $message_title = "Using Arabic language rewrite {$title} with limit of 64 character in total"; // rewrite // paraphras
+                $message_title = "Using Arabic language rewrite {$title}"; // rewrite // paraphras ,, with limit of 68 character in total
                 $generated_title = generate_content_with_min_word_count($message_title, $api_key);
                 //regenerate_post_title($post->ID,$generated_title);
                 // If empty title stop
