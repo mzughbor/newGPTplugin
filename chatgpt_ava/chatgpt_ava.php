@@ -852,10 +852,10 @@ function chatgpt_ava_private_rewrite()
             'timeout' => 60, // Increase the timeout value
             'body' => json_encode(array(
                 'messages' => array(
-                    array('role' => 'SEO professional writer', 'content' => 'Act like an SEO professional writer, 
+                    array('role' => 'system', 'content' => 'Act like an SEO professional writer, 
                     I need an optimized blog post, you will paraphrase a given article, you should focus
                     on readability, relevance, and proper keyword placement, please avoid keyword stuffing or
-                    over-optimization, input the final result in a well-structured HTML format.'),
+                    over-optimization.'),
                     array('role' => 'user', 'content' => $filtered_content),
                 ),
                 'model' => 'gpt-3.5-turbo', // Use the gpt-3.5-turbo model name here
