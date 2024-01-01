@@ -579,8 +579,8 @@ function chatgpt_ava_private_rewrite()
         $content = $post->post_title;
         //$message = 'give me Focus Keyphrase for this {$content}';
         //$message = 'suggest a possible focus keyphrase in Arabic, only 4 words from this brief summary {$content}';
-        //$message = 'give me Focus Keyphrase for this %s, please make sure to be only 4 words in Arabic' ;
-        $message = 'give me Focus Keyphrase for this %s, please make sure to be only 4 words in Arabic and don\'t use commas at all, try to make it one sentence' ;
+        //$message = 'give me Focus Keyphrase for this %s, please make sure to be only 4 words in Arabic';
+        $message = 'give me Focus Keyphrase for this %s, please make sure to be only 4 words in Arabic and don\'t use commas at all, try to make it one sentence';
         $message = sprintf($message, $content);
 
         // Generate a focus keyphrase using your existing function
