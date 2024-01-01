@@ -223,6 +223,7 @@ function test_ava_remove_custom_paragraphs($content) {
     // Pattern to match the unwanted paragraph with a strong tag    
     // Array of unwanted patterns
     $unwanted_patterns = array(
+
         '/أقرأ ايضًا:/u', //kora+
         '/أخبار متعلقة/u',
         '/طالع أيضًا:/u',
@@ -239,7 +240,7 @@ function test_ava_remove_custom_paragraphs($content) {
         '/اقرأ أيضا:/u', //2
         '/طالع أيضا/u',
         
-        '/المراجع/u', //mawdoo3.com // didn't worked 
+        '/المراجع/u', //mawdoo3.com // didn't worked ++ elakademiapost.com ? did work?
         '/محتويات/u', // we'll delete inter div
     );
     //  no-sometimes there is two ones in articles '/أخبار متعلقة/u',
@@ -281,6 +282,14 @@ function test_ava_remove_custom_paragraphs($content) {
 
     // Define the class names of the divs you want to remove
     $ids_and_classes_to_remove  = array(
+        'ez-toc-container', // id for elakademiapost.com
+        'h-المراجع', // id for ...
+        'd-sharing-enabled', // class for ...
+        'copy-link-tooltip', // id for ...
+        'copyLinkInput', // ...
+        'note', // ...
+        'post-tags', // ...
+        'post-categories', // ...
         'After_F_Paragraph', // Kora+ <id>
         'related-articles-list1', // mawdoo3 <class>
         'toc',// mawdoo3
@@ -943,7 +952,7 @@ function chatgpt_ava_private_rewrite()
 
                 // title regenerate content
                 $title = $post->post_title;
-                $message_title = "Using Arabic language rewrite {$title}"; // rewrite // reparaphras ,, with limit of 68 character in total
+                $message_title = "Using Arabic language rewrite {$title} with limit of 68 character in total"; // rewrite // reparaphras ,, 
                 $generated_title = generate_content_with_min_word_count($message_title, $api_key);
                 //regenerate_post_title($post->ID,$generated_title);
                 // If empty title stop
