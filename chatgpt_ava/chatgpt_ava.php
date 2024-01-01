@@ -852,7 +852,10 @@ function chatgpt_ava_private_rewrite()
             'timeout' => 60, // Increase the timeout value
             'body' => json_encode(array(
                 'messages' => array(
-                    array('role' => 'system', 'content' => 'You are a helpful assistant.'),
+                    array('role' => 'SEO professional writer', 'content' => 'Act like an SEO professional writer, 
+                    I need an optimized blog post, you will paraphrase a given article, you should focus
+                    on readability, relevance, and proper keyword placement, please avoid keyword stuffing or
+                    over-optimization, input the final result in a well-structured HTML format.'),
                     array('role' => 'user', 'content' => $filtered_content),
                 ),
                 'model' => 'gpt-3.5-turbo', // Use the gpt-3.5-turbo model name here
@@ -940,7 +943,7 @@ function chatgpt_ava_private_rewrite()
 
                 // title regenerate content
                 $title = $post->post_title;
-                $message_title = "Using Arabic language rewrite {$title}"; // rewrite // paraphras ,, with limit of 68 character in total
+                $message_title = "Using Arabic language rewrite {$title}"; // rewrite // reparaphras ,, with limit of 68 character in total
                 $generated_title = generate_content_with_min_word_count($message_title, $api_key);
                 //regenerate_post_title($post->ID,$generated_title);
                 // If empty title stop
@@ -988,7 +991,7 @@ function chatgpt_ava_private_rewrite()
 
                 //$message = "Rewrite this article {$filtered_content}, covering it to become less than 400 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 300 words. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier. (2) Wrap even paragraphs in <p> tags for improved readability. (3) make sure that 25% of the sentences you write contain less than 20 words.";
                 
-                $message = "Paraphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
+                $message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
 
 
                 //error_log('____________________' ."\n", 3, CUSTOM_LOG_PATH);
