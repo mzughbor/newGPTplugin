@@ -332,6 +332,7 @@ function test_ava_remove_custom_paragraphs($content) {
     }
     // Save the modified HTML back to the post content
     $content = $dom->saveHTML();
+    $content = html_entity_decode($content);
     return $content;
 }
 
@@ -547,7 +548,7 @@ function chatgpt_ava_private_rewrite()
                 return true;
             }
         } else {
-            error_log('-- you are inside else if 1... '."\n", 3, CUSTOM_LOG_PATH);
+            error_log('-- post_type not post/article... '."\n", 3, CUSTOM_LOG_PATH);
             return false;
         }
     }
@@ -921,7 +922,6 @@ function chatgpt_ava_private_rewrite()
             // filter added text like more news ...
             //$filterd_content = remove_custom_news($post->post_content);
             $filterd_content = test_ava_remove_custom_paragraphs($post->post_content);
-            $filterd_content = html_entity_decode($filterd_content);
             wp_update_post(array(
                 'ID' => $post->ID,
                 'post_content' => $filterd_content,
@@ -933,7 +933,7 @@ function chatgpt_ava_private_rewrite()
                     'post_status' => 'draft',
                 ));
             */
-            error_log('content saved successfully!'."\n", 3, CUSTOM_LOG_PATH);
+            error_log('content filteration saved successfully!'."\n", 3, CUSTOM_LOG_PATH);
 
             // if <p> filteration return empty article cause of any Special characters issues inside article
             //  I don't have to apply nested code anymore, it's fine to break evrything with this type of posts / Special characters
