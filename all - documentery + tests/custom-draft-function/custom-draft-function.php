@@ -239,6 +239,27 @@ function test_remove_custom_paragraphs($content) {
 
 
 
+// petter with latest paragrah and count all paragraphs    
+function chatgpt_ava_truncate_content($content, $max_characters)
+{
+    // Check if the content length exceeds the maximum characters
+    //if (mb_strlen($content) > $max_characters) {
+    if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
+        
+        //to delete
+        error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_DRAFT_LOG_PATH);
+        //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
+        
+        // Truncate the content to fit within the character limit
+        $content = mb_substr(strip_tags($content), 0, $max_characters);
+        
+        //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_DRAFT_LOG_PATH);
+
+    }
+    return $content;
+}
+
+
 
 function schedule_draft_function() {
     if (!wp_next_scheduled('custom_draft_function_event')) {
@@ -259,7 +280,8 @@ function custom_draft_function() {
     $draft_posts = get_posts($args);
 
     foreach ($draft_posts as $post) {
-        $content = test_custom_paragraphs($post->post_content);
+        //$content = test_custom_paragraphs($post->post_content);
+        $content = chatgpt_ava_truncate_content($post->post_content, 2500);
         wp_update_post(array(
             'ID' => $post->ID,
             'post_content' => $content,
@@ -282,6 +304,8 @@ function ten_minutes_interval($schedules) {
     return $schedules;
 }
 add_filter('cron_schedules', 'ten_minutes_interval');
+
+
 
 
 

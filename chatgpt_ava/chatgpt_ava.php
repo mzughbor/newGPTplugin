@@ -40,16 +40,12 @@ function chatgpt_ava_settings_page()
             $min_word_count = 115;
             $max_char_count = 8100; // without_space
             ?>
-        </form>
-        
+        </form>        
         <!-- Existing form for API key setting -->
-        
         <h2>Draft Posts List will auto delete at the end of the day</h2>
         <p>Below is the list of draft posts with less than <?php echo $min_word_count; ?> words or long text more that <?php echo $max_char_count; ?> charachters without spaces.</p>
         <?php display_draft_posts(); ?>
-        
         <!-- Rest of the form and submit button -->
-
     </div>
     <?php
 }
@@ -130,7 +126,7 @@ function chatgpt_ava_send_message()
     $message = sanitize_text_field($_POST['message']);
 
     // Helper function to truncate the content to fit within the token limit
-    function chatgpt_ava_truncate_content($content, $max_tokens)
+    function send_chatgpt_ava_truncate_content($content, $max_tokens)
     {
         // Truncate the content to fit within the token limit
         $tokens = str_word_count(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)) , 1); // for arabic
@@ -143,7 +139,7 @@ function chatgpt_ava_send_message()
 
     // Limit the content length if needed
     $max_tokens = 3770; // Model's maximum context length 40
-    $filtered_content = chatgpt_ava_truncate_content($message, $max_tokens);
+    $filtered_content = send_chatgpt_ava_truncate_content($message, $max_tokens);
 
     // Insert your ChatGPT API call here using the chat completions endpoint
     $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
@@ -179,9 +175,7 @@ function chatgpt_ava_send_message()
             error_log('chatgpt_ava_send_message function >> ChatGPT API Response Error: ' . print_r($response_body, true)."\n", 3, CUSTOM_LOG_PATH);
             $output = 'Generated content from ChatGPT';
         }
-
     }
-
     echo $output;
     wp_die();
 }
@@ -459,7 +453,7 @@ function chatgpt_ava_private_rewrite()
 
     /*
     // Helper function to truncate the content to fit within the token limit
-    function chatgpt_ava_truncate_content($content, $max_tokens)
+    function ...($content, $max_tokens)
     {
         // Truncate the content to fit within the token limit
         $tokens = str_word_count($content, 1); // for ar preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($text_to_count)) 
@@ -471,37 +465,35 @@ function chatgpt_ava_private_rewrite()
     }
     */
 
-    // butter with latest paragrah and count all paragraphs    
-        function chatgpt_ava_truncate_content($content, $max_characters)
-        {
-            // Check if the content length exceeds the maximum characters
-            //if (mb_strlen($content) > $max_characters) {
-            if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
-                
-                //to delete
-                error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_LOG_PATH);
-                //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
-                
-                // Truncate the content to fit within the character limit
-                $content = mb_substr(strip_tags($content), 0, $max_characters);
-                
-                //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_LOG_PATH);
+    // petter with latest paragrah and count all paragraphs    
+    function chatgpt_ava_truncate_content($content, $max_characters)
+    {
+        // Check if the content length exceeds the maximum characters
+        //if (mb_strlen($content) > $max_characters) {
+        if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
+            
+            //to delete
+            error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_LOG_PATH);
+            //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
+            
+            // Truncate the content to fit within the character limit
+            $content = mb_substr(strip_tags($content), 0, $max_characters);
+            
+            //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_LOG_PATH);
 
-            }
-            return $content;
         }
-        // future update
-        // here we have to work to make it come rally with paragraphs so we solve cutting issue
-        //
+        return $content;
+    }
 
     // function count content length and make decision before calling the Api
     //  the numbers is 130 word >> less than make it draft and save the post id in database 
     //  and make cron job once daily to  delete all the posts in that array in database
+
     function count_and_manage_posts($post_id, $content)
     {
-
-        $max_char_count = 8100; // without_space
-        $min_word_count = 115;
+        // edit 4 january 2024
+        // old way ... $max_char_count = 8100; // without_space
+        $min_word_count = 200; // defualt option / setup settings / old ... 115
         $post = get_post($post_id);
 
         error_log('-- Start of count_and_manage_posts :: ' . $post->ID ."\n", 3, CUSTOM_LOG_PATH);
@@ -511,11 +503,9 @@ function chatgpt_ava_private_rewrite()
         // when it's run inside loop?
         if ($post && $post->post_type === 'post') {
 
-            //old way before filteration function $content = $post->post_content;
-
-            //For string length without spaces:
-            $ch_string_length = strlen( preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)) ) - substr_count($content, ' ');
-            error_log('-- ch_string_length variable -no spaces : ' . $ch_string_length ."\n", 3, CUSTOM_LOG_PATH);
+            // For string length without spaces:
+            // old way ... $ch_string_length = strlen( preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)) ) - substr_count($content, ' ');
+            // old way ... error_log('-- ch_string_length variable -no spaces : ' . $ch_string_length ."\n", 3, CUSTOM_LOG_PATH);
 
             //For word count:
             //For Arabic launguage you have to use replace("/[\x{06 ideas 
@@ -527,24 +517,21 @@ function chatgpt_ava_private_rewrite()
 
             // the only one thing we missing in this counting function is numbers 10 100 1000 any numbers
 
-            if ($word_count < $min_word_count || $ch_string_length > $max_char_count) {
+            // old way ...  || $ch_string_length > $max_char_count
+            if ($word_count < $min_word_count) {
                 // Update post status to draft
                 wp_update_post(array(
                     'ID' => $post_id,
                     'post_status' => 'draft'
                 ));
-
-
-                error_log('(+_+) Content is to long\Short ... '."\n", 3, CUSTOM_LOG_PATH);
-
-
+                error_log('(+_+) Content is too Short ... '."\n", 3, CUSTOM_LOG_PATH);
                 // Store the post ID in the database (add your custom table logic here)
                 $draft_posts = get_option('draft_posts_array', array());
                 $draft_posts[] = $post_id;
                 update_option('draft_posts_array', $draft_posts);
                 return false;
             } else {
-                error_log('-- only TRUE case in truncate function ...'."\n", 3, CUSTOM_LOG_PATH);
+                error_log('-- only TRUE case in count_and_manage_posts() ...'."\n", 3, CUSTOM_LOG_PATH);
                 return true;
             }
         } else {
@@ -954,7 +941,6 @@ function chatgpt_ava_private_rewrite()
                 $title = $post->post_title;
                 $message_title = "Using Arabic language rewrite {$title} with limit of 68 character in total"; // rewrite // reparaphras ,, 
                 $generated_title = generate_content_with_min_word_count($message_title, $api_key);
-                //regenerate_post_title($post->ID,$generated_title);
                 // If empty title stop
                 if (!regenerate_post_title($post->ID,$generated_title)) {
                     
@@ -962,6 +948,7 @@ function chatgpt_ava_private_rewrite()
                         'ID' => $post_id,
                         'post_status' => 'draft'
                     ));
+
                     error_log('(^_*) Draft due error ... '."\n", 3, CUSTOM_LOG_PATH);
                     $draft_posts = get_option('draft_posts_array', array());
                     $draft_posts[] = $post_id;
