@@ -40,16 +40,12 @@ function chatgpt_ava_settings_page()
             $min_word_count = 115;
             $max_char_count = 8100; // without_space
             ?>
-        </form>
-        
-        <!-- Existing form for API key setting -->
-        
+        </form>        
+        <!-- Existing form for API key setting -->        
         <h2>Draft Posts List will auto delete at the end of the day</h2>
         <p>Below is the list of draft posts with less than <?php echo $min_word_count; ?> words or long text more that <?php echo $max_char_count; ?> charachters without spaces.</p>
-        <?php display_draft_posts(); ?>
-        
+        <?php display_draft_posts(); ?>        
         <!-- Rest of the form and submit button -->
-
     </div>
     <?php
 }
@@ -90,7 +86,6 @@ function get_draft_posts_array()
 function display_draft_posts()
 {
     $draft_posts = get_draft_posts_array();
-
     if (!empty($draft_posts)) {
         echo '<ul>';
         $num_lo = 1;
@@ -190,12 +185,10 @@ function chatgpt_ava_send_message()
 function delete_draft_posts_daily()
 {
     $draft_posts = get_option('draft_posts_array', array());
-
     if (!empty($draft_posts)) {
         foreach ($draft_posts as $post_id) {
             wp_delete_post($post_id, true);
         }
-
         // Clear the array after deleting the posts
         update_option('draft_posts_array', array());
     }
@@ -224,65 +217,28 @@ function test_ava_remove_custom_paragraphs($content) {
     // Array of unwanted patterns
     // replacment idea of text we don't need like المراجع dind't work in fucter update we'll fix it
     $unwanted_patterns = array(
-
         '/أقرأ ايضًا:/u', //kora+
         '/أخبار متعلقة/u',
         '/طالع أيضًا:/u',
         '/طالع أيضًا/u',
         '/WRONGERR/u',
-
         '/الأخبار الرئيسية/u', // bbc !! not working so we'll remove the inter div...
         '/قصص مقترحة/u', // bbc
         '/المزيد حول هذه القصة/u', // bbc
         '/مواضيع ذات صلة/u', // bbc
         '/اخترنا لكم/u', // bbc
-
         '/اقرأ أيضا:/u', //yalla_kora
         '/اقرأ أيضا:/u', //2
-        '/طالع أيضا/u',
-        
+        '/طالع أيضا/u',        
         '/المراجع/u', //mawdoo3.com // didn't worked ++ elakademiapost.com ? did work?
         '/محتويات/u', // we'll delete inter div
     );
     //  no-sometimes there is two ones in articles '/أخبار متعلقة/u',
 
-    // Flag to indicate whether an unwanted pattern is found
-    $unwanted_pattern_found = false;
-
     // Loop through patterns and remove them from content
     foreach ($unwanted_patterns as $pattern) {
-        // $content = preg_replace($pattern, '', $content); // old way
         if (preg_match($pattern, $content)) {
-
-            /*
-            This part of code is old and create an issue with content...
-            it's deleting what's not supposed to delete...
-                    
-            $unwanted_pattern_found = true;
-
-            // Pattern to match paragraphs or h3 elements with links
-            $pattern_with_links = '/<(div|p|h3|strong|li)>.*<a.*<\/(div|p|h3|strong|li)>/u';
-            
-            // If an unwanted pattern is found, look for links
-            if ($unwanted_pattern_found) {
-                // Find paragraphs or h3 elements with links
-                preg_match_all($pattern_with_links, $content, $matches);
-
-                // If there are paragraphs with links
-                if (!empty($matches[0])) {
-                    foreach ($matches[0] as $match) {
-                        // Remove the paragraph
-                        $content = str_replace($match, '', $content);        
-                        // If the removed paragraph doesn't have a link anymore, stop
-                        if (!strpos($match, '<a')) {
-                            break;
-                        }
-                    }
-                }
-            }
-            
             // Remove the unwanted pattern
-            */
             $content = preg_replace($pattern, '', $content);
         }
     }
@@ -347,7 +303,6 @@ function test_ava_remove_custom_paragraphs($content) {
 function triger_seo_analysis($post_id)
 {
     // 24-09
-
     // Get the Yoast SEO analysis class loader.
     require_once ABSPATH . 'wp-content/plugins/wordpress-seo/vendor/autoload.php';
     // Create a new Yoast SEO analysis object.
@@ -364,15 +319,6 @@ function triger_seo_analysis($post_id)
     //$update_result = wp_update_post($update_data);
     error_log('wp_update_post() ::' . print_r($analysis_results, true)."\n" , 3, CUSTOM_LOG_PATH);
 }
-
-
-//-----------------old code
-// Solving empty article return because of ' single quotation
-//$content = str_replace("'", '[SINGLE_QUOTE]', $content); // Replace single quotation marks with a placeholder
-//$content = str_replace('"', '[DOUBLE_QUOTE]', $content); // Replace double quotation marks with a placeholder
-// After processing, replace the placeholders back with single quotation marks
-//$new_content = str_replace('[SINGLE_QUOTE]', "'", $new_content);
-//$new_content = str_replace('[DOUBLE_QUOTE]', '"', $new_content);
 
 // this function used for filtering the keyphrase response
 function extract_arabic_text($text)
@@ -477,29 +423,26 @@ function chatgpt_ava_private_rewrite()
         return $content;
     }
     */
+   
+    function chatgpt_ava_truncate_content($content, $max_characters)
+    {
+        // Check if the content length exceeds the maximum characters
+        //if (mb_strlen($content) > $max_characters) {
+        if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
+            
+            //to delete
+            error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_LOG_PATH);
+            //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
+            
+            // Truncate the content to fit within the character limit
+            $content = mb_substr(strip_tags($content), 0, $max_characters);
+            
+            //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_LOG_PATH);
 
-    // butter with latest paragrah and count all paragraphs    
-        function chatgpt_ava_truncate_content($content, $max_characters)
-        {
-            // Check if the content length exceeds the maximum characters
-            //if (mb_strlen($content) > $max_characters) {
-            if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
-                
-                //to delete
-                error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_LOG_PATH);
-                //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
-                
-                // Truncate the content to fit within the character limit
-                $content = mb_substr(strip_tags($content), 0, $max_characters);
-                
-                //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_LOG_PATH);
-
-            }
-            return $content;
         }
-        // future update
-        // here we have to work to make it come rally with paragraphs so we solve cutting issue
-        //
+        return $content;
+    }
+
 
     // function count content length and make decision before calling the Api
     //  the numbers is 130 word >> less than make it draft and save the post id in database 
@@ -727,7 +670,6 @@ function chatgpt_ava_private_rewrite()
     // try to fix meta
     function checkMetaDescLength($text, $minLength=103, $maxLength=142, $overMaxLength=150)
     {
-
         $api_key = get_option('chatgpt_ava_api_key');
         $length = mb_strlen($text, 'UTF-8');
         //echo $length.'<br>';
@@ -923,23 +865,17 @@ function chatgpt_ava_private_rewrite()
             // If the post doesn't have a featured image, delete and skip this post
             wp_delete_post($post->ID, true);
             continue;
-        // Rest of the code to generate and update content based on the API response...
+            // Rest of the code to generate and update content based on the API response...
         } else {
-
             // filter added text like more news ...
             //$filterd_content = remove_custom_news($post->post_content);
             $filterd_content = test_ava_remove_custom_paragraphs($post->post_content);
+            
             wp_update_post(array(
                 'ID' => $post->ID,
                 'post_content' => $filterd_content,
             ));
 
-            /*                
-                wp_update_post(array(
-                    'ID' => $post->ID,
-                    'post_status' => 'draft',
-                ));
-            */
             error_log('content filteration saved successfully!'."\n", 3, CUSTOM_LOG_PATH);
 
             // if <p> filteration return empty article cause of any Special characters issues inside article
@@ -956,7 +892,6 @@ function chatgpt_ava_private_rewrite()
                 continue;
             } else {
                 error_log('+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+'."\n", 3, CUSTOM_LOG_PATH);
-
                 // title regenerate content
                 $title = $post->post_title;
                 $message_title = "Using Arabic language rewrite {$title} with limit of 68 character in total"; // rewrite // reparaphras ,, 
@@ -964,7 +899,6 @@ function chatgpt_ava_private_rewrite()
                 //regenerate_post_title($post->ID,$generated_title);
                 // If empty title stop
                 if (!regenerate_post_title($post->ID,$generated_title)) {
-                    
                     wp_update_post(array(
                         'ID' => $post_id,
                         'post_status' => 'draft'
@@ -978,32 +912,27 @@ function chatgpt_ava_private_rewrite()
                 error_log('~old: ' . print_r($title, true)."\n", 3, CUSTOM_LOG_PATH);
                 error_log('~new: ' . print_r($generated_title, true)."\n", 3, CUSTOM_LOG_PATH);
 
-                //$message = "rewrite this article {$post_content}, covering it to become less than 300 words in total using the Arabic language. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 250 words. Make it coherent and proficient.";
-
                 $post_content = $filterd_content;
                 // Limit the content length if needed
                 $max_tokens = 3310; // Model's maximum context length
-
+                
                 $filtered_content = chatgpt_ava_truncate_content($post_content, $max_tokens);
 
-                sleep(2);
-                
+                sleep(2);                
                 $update_data = array(
                     'ID'           => $post->ID,
                     'post_content' => $filtered_content,
                 );
-
                 $update_result = wp_update_post($update_data);
-
                 $generated_keyphrase = generate_and_set_focus_keyphrase($post->ID, $api_key);
                 error_log('~-~: ' . print_r($generated_keyphrase, true)."\n", 3, CUSTOM_LOG_PATH);
-
                 // the idea is to skip the current loop if there is an error with keyphrase...
                 if (!$generated_keyphrase) {
                     error_log('~continue~ed next ittertion'."\n", 3, CUSTOM_LOG_PATH);
                     continue;
                 }
 
+                //$message = "rewrite this article {$post_content}, covering it to become less than 300 words in total using the Arabic language. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 250 words. Make it coherent and proficient.";
 
                 //$message = "Rewrite this article {$filtered_content}, covering it to become less than 400 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 300 words. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier. (2) Wrap even paragraphs in <p> tags for improved readability. (3) make sure that 25% of the sentences you write contain less than 20 words.";
                 
