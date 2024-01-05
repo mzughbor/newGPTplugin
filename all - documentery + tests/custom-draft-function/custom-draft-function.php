@@ -16,10 +16,11 @@ if (!file_exists($log_dir)) {
 }
 
 function test_custom_paragraphs($content){
-
     // Pattern to match the unwanted paragraph with a strong tag    
     // Array of unwanted patterns
+    // replacment idea of text we don't need like المراجع dind't work in fucter update we'll fix it
     $unwanted_patterns = array(
+
         '/أقرأ ايضًا:/u', //kora+
         '/أخبار متعلقة/u',
         '/طالع أيضًا:/u',
@@ -36,18 +37,25 @@ function test_custom_paragraphs($content){
         '/اقرأ أيضا:/u', //2
         '/طالع أيضا/u',
         
-        '/المراجع/u', //mawdoo3.com // didn't worked 
+        '/المراجع/u', //mawdoo3.com // didn't worked ++ elakademiapost.com ? did work?
         '/محتويات/u', // we'll delete inter div
     );
+    
     //  no-sometimes there is two ones in articles '/أخبار متعلقة/u',
 
     // Flag to indicate whether an unwanted pattern is found
     $unwanted_pattern_found = false;
 
     // Loop through patterns and remove them from content
+    
     foreach ($unwanted_patterns as $pattern) {
         // $content = preg_replace($pattern, '', $content); // old way
         if (preg_match($pattern, $content)) {
+            
+            /*
+                    This part of code is old and create an issue with content...
+                    it's deleting what's not supposed to delete...
+
             $unwanted_pattern_found = true;
 
             // Pattern to match paragraphs or h3 elements with links
@@ -70,14 +78,22 @@ function test_custom_paragraphs($content){
                     }
                 }
             }
-            
+            */
             // Remove the unwanted pattern
             $content = preg_replace($pattern, '', $content);
         }
     }
-
+    
     // Define the class names of the divs you want to remove
     $ids_and_classes_to_remove  = array(
+        'ez-toc-container', // id for elakademiapost.com
+        'h-المراجع', // id for ...
+        'd-sharing-enabled', // class for ...
+        'copy-link-tooltip', // id for ...
+        'copyLinkInput', // ...
+        'note', // ...
+        'post-tags', // ...
+        'post-categories', // ...
         'After_F_Paragraph', // Kora+ <id>
         'related-articles-list1', // mawdoo3 <class>
         'toc',// mawdoo3
@@ -122,9 +138,6 @@ function test_custom_paragraphs($content){
     $content = $dom->saveHTML();
     return $content;
 }
-
-
-
 
 
 
@@ -239,27 +252,6 @@ function test_remove_custom_paragraphs($content) {
 
 
 
-// petter with latest paragrah and count all paragraphs    
-function chatgpt_ava_truncate_content($content, $max_characters)
-{
-    // Check if the content length exceeds the maximum characters
-    //if (mb_strlen($content) > $max_characters) {
-    if (strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content))) > $max_characters) {
-        
-        //to delete
-        error_log('**inside chatgpt_ava_truncate_content > mb_strlen(): ' . print_r(strlen($content), true)."\n", 3, CUSTOM_DRAFT_LOG_PATH);
-        //error_log('**inside chatgpt_ava_truncate_content > mb_strlen(preg_replace(...)): ' . print_r(strlen(preg_replace("/[\x{0600}-\x{06FF}a-zA-Z]/u", "a", strip_tags($content)), true))."\n", 3, CUSTOM_LOG_PATH);
-        
-        // Truncate the content to fit within the character limit
-        $content = mb_substr(strip_tags($content), 0, $max_characters);
-        
-        //error_log('full content: ' . print_r($content, true)."\n", 3, CUSTOM_DRAFT_LOG_PATH);
-
-    }
-    return $content;
-}
-
-
 
 function schedule_draft_function() {
     if (!wp_next_scheduled('custom_draft_function_event')) {
@@ -280,8 +272,7 @@ function custom_draft_function() {
     $draft_posts = get_posts($args);
 
     foreach ($draft_posts as $post) {
-        //$content = test_custom_paragraphs($post->post_content);
-        $content = chatgpt_ava_truncate_content($post->post_content, 2500);
+        $content = test_custom_paragraphs($post->post_content);
         wp_update_post(array(
             'ID' => $post->ID,
             'post_content' => $content,
@@ -304,8 +295,6 @@ function ten_minutes_interval($schedules) {
     return $schedules;
 }
 add_filter('cron_schedules', 'ten_minutes_interval');
-
-
 
 
 
