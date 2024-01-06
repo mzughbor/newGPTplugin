@@ -812,7 +812,7 @@ function chatgpt_ava_private_rewrite()
             'body' => json_encode(array(
                 'messages' => array(
                     array('role' => 'system', 'content' => 'Act like an SEO professional writer, 
-                    I need an optimized blog post, you will paraphrase a given article, you should focus
+                    I need an optimized blog post, you will paraphrase a given article paragraphs, you should focus
                     on readability, relevance, and proper keyword placement, please avoid keyword stuffing or
                     over-optimization.'),
                     array('role' => 'user', 'content' => $filtered_content),
@@ -916,14 +916,18 @@ function chatgpt_ava_private_rewrite()
                 // Limit the content length if needed
                 $max_tokens = 3310; // Model's maximum context length
                 
-                $filtered_content = chatgpt_ava_truncate_content($post_content, $max_tokens);
+                //$filtered_content = chatgpt_ava_truncate_content($post_content, $max_tokens);
 
                 sleep(2);                
+                /*
                 $update_data = array(
                     'ID'           => $post->ID,
                     'post_content' => $filtered_content,
                 );
+                
                 $update_result = wp_update_post($update_data);
+                */
+
                 $generated_keyphrase = generate_and_set_focus_keyphrase($post->ID, $api_key);
                 error_log('~-~: ' . print_r($generated_keyphrase, true)."\n", 3, CUSTOM_LOG_PATH);
                 // the idea is to skip the current loop if there is an error with keyphrase...

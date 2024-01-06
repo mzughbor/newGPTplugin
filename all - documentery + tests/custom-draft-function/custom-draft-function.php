@@ -15,6 +15,56 @@ if (!file_exists($log_dir)) {
     mkdir($log_dir, 0755, true);
 }
 
+//06/01/2024
+function filter_post_content($content) {
+    // Split the content into blocks based on headings
+    $blocks = preg_split('/<h[1-6].*?>/', $content);
+
+    // Remove empty blocks
+    $blocks = array_filter($blocks);
+
+    $filtered_content = [];
+
+    foreach ($blocks as $index => $block) {
+        // Get the heading and its paragraph
+        preg_match('/<h[1-6].*?>(.*?)<\/h[1-6]>/s', $block, $matches);
+
+        if (!empty($matches[1])) {
+            // If there is a heading, include it and the paragraph
+            $heading = $matches[0];
+            $paragraph = substr($block, strlen($matches[0]));
+
+            // Check if the total length is less than or equal to 2550 characters
+            if (strlen($heading . $paragraph) <= 2550) {
+                $filtered_content[] = [
+                    'type' => 'heading_with_paragraph',
+                    'content' => $heading . $paragraph,
+                ];
+            } else {
+                // If the total length exceeds 2550 characters, add the paragraph as a separate block
+                $filtered_content[] = [
+                    'type' => 'heading',
+                    'content' => $heading,
+                ];
+
+                $filtered_content[] = [
+                    'type' => 'paragraph',
+                    'content' => $paragraph,
+                ];
+            }
+        } else {
+            // If there is no heading, include the entire paragraph as a separate block
+            $filtered_content[] = [
+                'type' => 'paragraph',
+                'content' => $block,
+            ];
+        }
+    }
+
+    return $filtered_content;
+}
+
+
 function test_custom_paragraphs($content){
     // Pattern to match the unwanted paragraph with a strong tag    
     // Array of unwanted patterns
@@ -272,17 +322,30 @@ function custom_draft_function() {
     $draft_posts = get_posts($args);
 
     foreach ($draft_posts as $post) {
+        
         $content = test_custom_paragraphs($post->post_content);
+        
+        // Example usage
+        $split_blocks = filter_post_content($content);
+        error_log(print_r($split_blocks, true), 3, CUSTOM_DRAFT_LOG_PATH);
+
+        /*
+        foreach ($split_blocks as $block) {
+            error_log('~~~~~~~~ '."\n" . print_r($block, true) . PHP_EOL ."\n", 3, CUSTOM_DRAFT_LOG_PATH);
+        }
+        */
+
         wp_update_post(array(
             'ID' => $post->ID,
             'post_content' => $content,
         ));
-        
+                
         // Convert the post to private/draft
         wp_update_post(array(
             'ID' => $post->ID,
             'post_status' => 'draft', // Set to 'private'
-        ));        
+        ));
+        
     }
 }
 add_action('custom_draft_function_event', 'custom_draft_function');
@@ -295,78 +358,3 @@ function ten_minutes_interval($schedules) {
     return $schedules;
 }
 add_filter('cron_schedules', 'ten_minutes_interval');
-
-
-
-
-
-
-
-
-
-
-
-// ------------- old filteration function
-
-    // Filteration function for all inclusions and exclusions like more news and so on...
-    function old_filter_row_post_content($post_id){
-
-        $post = get_post($post_id);
-
-        $content = $post->post_content;
-        
-        // filter content Yallakora.com (1) case
-        // Check if the content contains "اقرأ أيضاً.." text
-        if (strpos($content, 'اقرأ أيضا:') !== false) {
-
-            // Remove "اقرأ أيضاً.." text
-            $pattern = '/اقرأ أيضا:/u';
-            $content = preg_replace($pattern, '',  $content);
-            error_log('----mm\'----'. $content ."\n", 3, CUSTOM_LOG_PATH);
-
-            // Solving empty article return because of ' single quotation
-            $content = str_replace("'", '[SINGLE_QUOTE]', $content); // Replace single quotation marks with a placeholder
-            $content = str_replace('"', '[DOUBLE_QUOTE]', $content); // Replace double quotation marks with a placeholder
-
-            error_log('----xx\'----'. $content ."\n", 3, CUSTOM_LOG_PATH);
-
-            // Split content into paragraphs
-            $paragraphs = explode('</p>', $content);
-            error_log('----pp\'----'. $paragraphs ."\n", 3, CUSTOM_LOG_PATH);
-
-            // Find paragraphs with <a> tags and remove following paragraphs
-            $new_content = '';
-            $inside_link_paragraph = false;
-            foreach ($paragraphs as $paragraph) {
-                error_log('----ff\'----' ."\n", 3, CUSTOM_LOG_PATH);
-                if (strpos($paragraph, '<a') !== false) {
-                    $inside_link_paragraph = true;
-                    error_log('----if1\'----' ."\n", 3, CUSTOM_LOG_PATH);
-                }
-                if (!$inside_link_paragraph) {
-                    $new_content .= $paragraph . '</p>';
-                    error_log('----if2\'----' ."\n", 3, CUSTOM_LOG_PATH);                
-                }
-                if (strpos($paragraph, '</a>') !== false) {
-                    $inside_link_paragraph = false;
-                    error_log('----if3\'----' ."\n", 3, CUSTOM_LOG_PATH);                
-                }
-            }
-
-            error_log('----------------------------------------' ."\n", 3, CUSTOM_LOG_PATH);
-            // After processing, replace the placeholders back with single quotation marks
-            $new_content = str_replace('[SINGLE_QUOTE]', "'", $new_content);
-            $new_content = str_replace('[DOUBLE_QUOTE]', '"', $new_content);
-            error_log('-- Yallakora case(1) --: ' . $new_content ."\n", 3, CUSTOM_LOG_PATH);
-
-            // Check if filtered content is empty
-            //if (empty($new_content)) {
-            //    return $content; // Return original content if filtered content is empty
-            //    error_log('** ALERT ************************* : '."\n", 3, CUSTOM_LOG_PATH);
-            //}
-            error_log('** ALERT ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ : '."\n", 3, CUSTOM_LOG_PATH);
-            return $new_content;            
-        }
-        error_log('** ALERT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% : '."\n", 3, CUSTOM_LOG_PATH);
-        return $content; // Return original content if "اقرأ أيضاً.." text is not found
-    }
