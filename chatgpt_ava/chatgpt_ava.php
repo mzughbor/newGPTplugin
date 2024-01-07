@@ -443,21 +443,37 @@ function chatgpt_ava_private_rewrite()
         return $content;
     }
 
+    //07/01/2024
+    // this function for filtering content before sending it to chatGPT, and fixing extra array of blocks issues. 
+    function filter_allowed_tags($content) {
+        // Define the allowed HTML tags
+        $allowed_tags = '<h1><h2><h3><h4><h5><h6><p><img><picture><source><b><i><em><strong><a><ul><ol><li><table><tr><th><td><strong>';
+    
+        // Use strip_tags to allow only the specified tags
+        $contentFiltered = strip_tags($content, $allowed_tags);
+    
+        return $contentFiltered;
+    }
+
     //06/01/2024
+    // this function responsible for cutting articles into chanks or blocks based on thier headding and paragraphs
     function filter_post_content($content) {
         
         // Convert content to UTF-8 if needed
         $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
+
+        // Filter allowed HTML tags
+        $contentFiltered = filter_allowed_tags($contentUTF8);
 
         // Open log file for writing with UTF-8 encoding
         $context = stream_context_create(['encoding' => 'UTF-8']);
         $file = fopen(CUSTOM_LOG_PATH, 'a', false, $context);
 
         // Write the content to the log file
-        fwrite($file, $contentUTF8);
+        fwrite($file, $contentUTF8); // need to be commented...
 
         // Split the content into blocks based on headings        
-        $blocks = preg_split('/<h[1-6].*?>/', $contentUTF8);
+        $blocks = preg_split('/<h[1-6].*?>/', $contentFiltered);
 
         // Remove empty blocks
         $blocks = array_filter($blocks);
