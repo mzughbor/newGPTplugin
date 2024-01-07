@@ -3,7 +3,7 @@
 /*
 Plugin Name: ChatGPT with Ava - Private Rewrites
 Description: Rewrite private post content using ChatGPT API as a cron job.
-Version: 1.81
+Version: 1.90
 Author: mZughbor
 */
 
@@ -273,7 +273,7 @@ function test_ava_remove_custom_paragraphs($content) {
     // Check if the DOMDocument was created successfully
     if (!$dom) {
         // we'll edit return lateer to be at the bottom
-        error_log('Failed .. !dom :: So return content ...\n' , 3, CUSTOM_DRAFT_LOG_PATH);        
+        error_log('Failed .. !dom :: So return content ...\n' , 3, CUSTOM_LOG_PATH);        
         return $content;
     }
 
@@ -443,6 +443,66 @@ function chatgpt_ava_private_rewrite()
         return $content;
     }
 
+    //06/01/2024
+    function filter_post_content($content) {
+        
+        // Convert content to UTF-8 if needed
+        $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
+
+        // Open log file for writing with UTF-8 encoding
+        $context = stream_context_create(['encoding' => 'UTF-8']);
+        $file = fopen(CUSTOM_LOG_PATH, 'a', false, $context);
+
+        // Write the content to the log file
+        fwrite($file, $contentUTF8);
+
+        // Split the content into blocks based on headings        
+        $blocks = preg_split('/<h[1-6].*?>/', $contentUTF8);
+
+        // Remove empty blocks
+        $blocks = array_filter($blocks);
+
+        $filtered_content = [];
+
+        foreach ($blocks as $index => $block) {
+            // Get the heading and its paragraph
+            preg_match('/<h[1-6].*?>(.*?)<\/h[1-6]>/s', $block, $matches);
+
+            if (!empty($matches[1])) {
+                // If there is a heading, include it and the paragraph
+                $heading = $matches[0];
+                $paragraph = substr($block, strlen($matches[0]));
+
+                // Check if the total length is less than or equal to 2550 characters
+                if (strlen($heading . $paragraph) <= 2550) {
+                    $filtered_content[] = [
+                        'type' => 'heading_with_paragraph',
+                        'content' => $heading . $paragraph,
+                    ];
+                } else {
+                    // If the total length exceeds 2550 characters, add the paragraph as a separate block
+                    $filtered_content[] = [
+                        'type' => 'heading',
+                        'content' => $heading,
+                    ];
+
+                    $filtered_content[] = [
+                        'type' => 'paragraph',
+                        'content' => $paragraph,
+                    ];
+                }
+            } else {
+                // If there is no heading, include the entire paragraph as a separate block
+                $filtered_content[] = [
+                    'type' => 'paragraph',
+                    'content' => $block,
+                ];
+            }
+        }
+        // Close the file
+        fclose($file);
+        return $filtered_content;
+    }
 
     // function count content length and make decision before calling the Api
     //  the numbers is 130 word >> less than make it draft and save the post id in database 
@@ -798,7 +858,24 @@ function chatgpt_ava_private_rewrite()
         );
         wp_update_post($updated_post);
     }
-
+    
+    function append_content_to_post($post_ID, $additional_content) {
+        // Get the existing post content
+        $existing_content = get_post_field('post_content', $post_ID);
+    
+        // Concatenate the existing content with the new content
+        $updated_content = $existing_content . $additional_content;
+    
+        // Update the post with the combined content
+        $updated_post = array(
+            'ID' => $post_ID,
+            'post_content' => $updated_content,
+            'post_status' => 'publish',
+        );
+    
+        wp_update_post($updated_post);
+    }
+    
     // Recursive function to generate content until it meets the minimum word count requirement
     //function ...($filtered_content, $api_key, $temperature = 1, $max_tokens = 4096, $top_p = 1)
     function generate_content_with_min_word_count($filtered_content, $api_key)
@@ -849,6 +926,144 @@ function chatgpt_ava_private_rewrite()
             return false;
         }
     }
+    
+    // 07/01/24
+    // this function for appling new response action
+    function check_response_code($word_count, $api_key, $post, $generated_content)
+    {
+        //word_count = 0 delete post thats mean the api return error 
+
+        $min_word_count = 200; //min_word_generated_count  // old 250
+        if ($word_count == 0) {
+            $result = wp_delete_post($post->ID, true);
+            error_log('error post deleted :: ID' . $post->ID ."\n", 3, CUSTOM_LOG_PATH); 
+        }
+
+        elseif ($word_count <= $min_word_count) {
+            while ($word_count <= $min_word_count) {
+
+                $message = "continue";
+                //$filtered_content = chatgpt_ava_truncate_content($message, $max_tokens);
+                $new_content = generate_content_with_min_word_count($message, $api_key);
+                sleep(12);
+                $new_content = strtolower(trim($new_content));
+
+
+                // Array of words to search for in the response
+                $search_words = array('of course', 'certainly', 'sure', 'help', 'questions', 'assisting', 'tasks', 'today', 'assist');
+
+                // Check if any of the words exist in the response
+                $found_words = array();
+                foreach ($search_words as $word) {
+                    if (strpos($new_content, $word) !== false) {
+                        $found_words[] = $word;
+                    }
+                }
+
+                if (!empty($found_words)) {
+                    // Some of the words were found in the $response
+                    // for debugging
+                    error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
+                    // Log the response for debugging
+
+                    // right place for unset ?
+                    unset($found_words);
+                    // mzug latest update
+                    //puplish_now($post->ID,$generated_content);
+                    append_content_to_post($post->ID,$generated_content);
+                    break; // 11/09
+                    //continue; it's the right solution to berak the while loop
+
+                } else {
+                    // None of the words were found in the $response
+                    error_log('The response does not contain any of the specified words: '."\n", true, 3, CUSTOM_LOG_PATH);
+
+                    $generated_content .= $new_content;
+                    $word_count = count_words($generated_content);
+                }
+                // emptty after $message = "continue" every time
+                unset($found_words);
+
+                //The latest content has ' . $word_count . ' words. 
+                $question = 'Are you done? Answer with YES or NO'; 
+                $response = generate_content_with_min_word_count($question, $api_key);
+                sleep(3);
+
+                // Convert the response to lowercase for better comparison
+                $response = strtolower(trim($response));
+
+                if ($response === '<p>yes</p>' or $response === '<p>yes.</p>') {
+                    // The user (ChatGPT) is done generating content
+                    //puplish_now($post->ID,$generated_content);
+                    append_content_to_post($post->ID,$generated_content);
+                    continue; // 11/09 replace break with continue
+
+                } elseif ($response === '<p>no</p>' or $response === '<p>no.</p>') {
+                    // The user (ChatGPT) is not done, ask to continue generating content
+                    $message = "please continue";
+                    //$filtered_content = chatgpt_ava_truncate_content($message, $max_tokens);
+                    $new_content_2 = generate_content_with_min_word_count($message, $api_key);
+                    sleep(12);
+
+
+                    foreach ($search_words as $word) {
+                        if (strpos($new_content_2, $word) !== false) {
+                            $found_words[] = $word;
+                        }
+                    }
+
+                    if (!empty($found_words)) {
+                        // Some of the words were found in the $response
+                        // for debugging
+                        error_log('The response contains the following words: 2' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
+                            // Log the response for debugging  
+
+                        unset($found_words);
+                        //puplish_now($post->ID,$generated_content);
+                        append_content_to_post($post->ID,$generated_content);
+                        continue; // 11/09 replace ...
+
+                    } else {
+                        // None of the words were found in the $response
+                        error_log('The response does not contain any of the specified words: 2'."\n", true, 3, CUSTOM_LOG_PATH);
+
+                        $generated_content .= $new_content_2;
+                        $word_count = count_words($generated_content);
+                                //puplish_now($post->ID,$generated_content); //mistake ???
+                    }
+                    // emptty after $message = "continue" every time
+                    unset($found_words);
+                // raear to happen here this else case...1/aug / not very sure
+                } else {
+                    // Log the error for debugging
+                    error_log('ChatGPT YES NO Error: ' . $post->ID, 3, CUSTOM_LOG_PATH);
+
+                    //error_log('ChatGPT YES NO API Error: ' . $response->get_error_message()); 
+                    // for debugging
+                    error_log('ChatGPT YES NO API Error: ' . print_r($response, true), 3, CUSTOM_LOG_PATH);
+                        // Log the response for debugging               
+                    wp_update_post(array('ID' => $post->ID, 'post_status' => 'draft'));
+                }
+            }   
+        }       
+        // Update the post with the generated content and change post status to publish
+        elseif ($word_count > $min_word_count) {
+            // suppose he didn't finish ??? here ... mzug
+            $updated_post = array(
+                'ID' => $post->ID,
+                'post_content' => $generated_content, // Use the content with empty lines
+                'post_status' => 'publish',
+            );
+            //wp_update_post($updated_post);
+            append_content_to_post($post->ID, $generated_content); // this is 1'st target one?!?
+        } else {
+            // Log the error for debugging / it's not logical to be here...
+            error_log('--not logical--Content generation failed for private post ID: ' . $post->ID."\n", 3, CUSTOM_LOG_PATH);
+
+            wp_update_post(array('ID' => $post->ID, 'post_status' => 'draft'));
+        }
+
+    }
 
     // Get private posts
     $private_posts = get_posts(array(
@@ -873,7 +1088,7 @@ function chatgpt_ava_private_rewrite()
             
             wp_update_post(array(
                 'ID' => $post->ID,
-                'post_content' => $filterd_content,
+                'post_content' => $filterd_content, // it'should be like that only without old content it's for filtreation.
             ));
 
             error_log('content filteration saved successfully!'."\n", 3, CUSTOM_LOG_PATH);
@@ -915,19 +1130,18 @@ function chatgpt_ava_private_rewrite()
                 $post_content = $filterd_content;
                 // Limit the content length if needed
                 $max_tokens = 3310; // Model's maximum context length
+                //$filtered_content = chatgpt_ava_truncate_content($post_content, $max_tokens);                
                 
-                //$filtered_content = chatgpt_ava_truncate_content($post_content, $max_tokens);
-
-                sleep(2);                
-                /*
-                $update_data = array(
-                    'ID'           => $post->ID,
-                    'post_content' => $filtered_content,
-                );
+                // Convert content to UTF-8 if needed
+                $contentUTF8 = mb_convert_encoding($post_content, 'UTF-8', 'auto');
                 
-                $update_result = wp_update_post($update_data);
-                */
+                // Example usage
+                $split_blocks = filter_post_content($contentUTF8);
 
+                error_log('~~hell!:( ' . print_r($split_blocks, true)."\n", 3, CUSTOM_LOG_PATH);
+
+                sleep(2);
+                // generate keyphrases to use it when writing the post...
                 $generated_keyphrase = generate_and_set_focus_keyphrase($post->ID, $api_key);
                 error_log('~-~: ' . print_r($generated_keyphrase, true)."\n", 3, CUSTOM_LOG_PATH);
                 // the idea is to skip the current loop if there is an error with keyphrase...
@@ -935,13 +1149,38 @@ function chatgpt_ava_private_rewrite()
                     error_log('~continue~ed next ittertion'."\n", 3, CUSTOM_LOG_PATH);
                     continue;
                 }
+                // future update to stop this if post is acaully deleted due to previous erroe                 
+                error_log('generated_keyphrase ::' . print_r($generated_keyphrase, true)."\n" , 3, CUSTOM_LOG_PATH);
+
+                error_log('~~~~~~~~<Content Started>~~~~~~~~~~'."\n", 3, CUSTOM_LOG_PATH);
+                
+                $flagey = 1;
+                foreach ($split_blocks as $item) {
+                    $part = $item['content'];
+                    //..old...$message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
+                    $message = "Reparaphras this {$part} of article with using {$generated_keyphrase} as the Focus keyphrase use Arabic language.  Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Make sure that 25% of the sentences you write contain less than 20 words.";
+                    // Generate content and check word count until it meets the minimum requirement
+                    $generated_content = generate_content_with_min_word_count($message, $api_key);
+                    sleep(12);
+
+                    $word_count = count_words($generated_content);
+                    error_log('The response for part '. $flagey . ' api word count is: ' . print_r($word_count, true)."\n", 3, CUSTOM_LOG_PATH);
+                    //error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
+    
+                    // Ask ChatGPT to continue generating content until it reaches the minimum word count
+                    check_response_code($word_count, $api_key, $post, $generated_content);
+                    $flagey += 1;
+                }
+                
+                error_log('~~~~~~~~~<Content Ended>~~~~~~~~~~~'."\n", 3, CUSTOM_LOG_PATH);
+
+
 
                 //$message = "rewrite this article {$post_content}, covering it to become less than 300 words in total using the Arabic language. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 250 words. Make it coherent and proficient.";
 
                 //$message = "Rewrite this article {$filtered_content}, covering it to become less than 400 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Use a cohesive structure to ensure smooth transitions between ideas, focus on summarizing and shortening the content, and make sure it's at least not less than 300 words. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier. (2) Wrap even paragraphs in <p> tags for improved readability. (3) make sure that 25% of the sentences you write contain less than 20 words.";
                 
-                $message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
-
+                //$message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
 
                 //error_log('____________________' ."\n", 3, CUSTOM_LOG_PATH);
 
@@ -954,158 +1193,10 @@ function chatgpt_ava_private_rewrite()
                 //$notes = $yoast_seo->get_notes();
 
                 //error_log('____________________' ."\n", 3, CUSTOM_LOG_PATH);
-
                 //error_log(print_r($notes, true)."\n", 3, CUSTOM_LOG_PATH);
-
-
 
                 //$message = "Rewrite this article {$filtered_content} with using of {$generated_keyphrase} as Focus keyphrase, covering it to become more than 302 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Use a cohesive structure to ensure smooth transitions between ideas, while writing focus on SEO score of Yoast and readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier. (2) Wrap even paragraphs in <p> tags for improved readability. (3) make sure that 25% of the sentences you write contain less than 20 words. (4) insert internal link in the post as outgoing and other one for internal site wedti.com";
 
-                // Generate content and check word count until it meets the minimum requirement
-                $generated_content = generate_content_with_min_word_count($message, $api_key);
-                $word_count = count_words($generated_content);
-                error_log('The first response from api word count: ' . print_r($word_count, true)."\n", 3, CUSTOM_LOG_PATH);
-                //error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
-
-
-
-
-                // Ask ChatGPT to continue generating content until it reaches the minimum word count
-
-                sleep(12);
-                
-                //word_count = 0 delete post thats mean the api return error 
-
-                $min_word_count = 200; //min_word_generated_count  // old 250
-                if ($word_count == 0) {
-                    $result = wp_delete_post($post->ID, true);
-                    error_log('error post deleted :: ID' . $post->ID ."\n", 3, CUSTOM_LOG_PATH); 
-                }
-
-                elseif ($word_count <= $min_word_count) {
-                    while ($word_count <= $min_word_count) {
-
-                        $message = "continue";
-                        //$filtered_content = chatgpt_ava_truncate_content($message, $max_tokens);
-                        $new_content = generate_content_with_min_word_count($message, $api_key);
-                        sleep(12);
-                        $new_content = strtolower(trim($new_content));
-
-
-                        // Array of words to search for in the response
-                        $search_words = array('of course', 'certainly', 'sure', 'help', 'questions', 'assisting', 'tasks', 'today', 'assist');
-
-                        // Check if any of the words exist in the response
-                        $found_words = array();
-                        foreach ($search_words as $word) {
-                            if (strpos($new_content, $word) !== false) {
-                                $found_words[] = $word;
-                            }
-                        }
-
-                        if (!empty($found_words)) {
-                            // Some of the words were found in the $response
-                            // for debugging
-                            error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
-                             // Log the response for debugging
-
-                            // right place for unset ?
-                            unset($found_words);
-                            // mzug latest update
-                            puplish_now($post->ID,$generated_content);
-                            break; // 11/09
-                            //continue; it's the right solution to berak the while loop
-
-                        } else {
-                            // None of the words were found in the $response
-                            error_log('The response does not contain any of the specified words: '."\n", true, 3, CUSTOM_LOG_PATH);
-
-                            $generated_content .= $new_content;
-                            $word_count = count_words($generated_content);
-                        }
-                        // emptty after $message = "continue" every time
-                        unset($found_words);
-
-                        //The latest content has ' . $word_count . ' words. 
-                        $question = 'Are you done? Answer with YES or NO'; 
-                        $response = generate_content_with_min_word_count($question, $api_key);
-                        sleep(3);
-
-                        // Convert the response to lowercase for better comparison
-                        $response = strtolower(trim($response));
-
-                        if ($response === '<p>yes</p>' or $response === '<p>yes.</p>') {
-                            // The user (ChatGPT) is done generating content
-                            puplish_now($post->ID,$generated_content);
-                            continue; // 11/09 replace break with continue
-
-                        } elseif ($response === '<p>no</p>' or $response === '<p>no.</p>') {
-                            // The user (ChatGPT) is not done, ask to continue generating content
-                            $message = "please continue";
-                            //$filtered_content = chatgpt_ava_truncate_content($message, $max_tokens);
-                            $new_content_2 = generate_content_with_min_word_count($message, $api_key);
-                            sleep(12);
-
-
-                            foreach ($search_words as $word) {
-                                if (strpos($new_content_2, $word) !== false) {
-                                    $found_words[] = $word;
-                                }
-                            }
-
-                            if (!empty($found_words)) {
-                                // Some of the words were found in the $response
-                                // for debugging
-                                error_log('The response contains the following words: 2' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
-                                 // Log the response for debugging  
-
-                                unset($found_words);
-                                puplish_now($post->ID,$generated_content);
-                                continue; // 11/09 replace ...
-
-                            } else {
-                                // None of the words were found in the $response
-                                error_log('The response does not contain any of the specified words: 2'."\n", true, 3, CUSTOM_LOG_PATH);
-
-                                $generated_content .= $new_content_2;
-                                $word_count = count_words($generated_content);
-                                //puplish_now($post->ID,$generated_content); mistake ???
-                            }
-                            // emptty after $message = "continue" every time
-                            unset($found_words);
-                        // raear to happen here this else case...1/aug / not very sure
-                        } else {
-                        // Log the error for debugging
-                        error_log('ChatGPT YES NO Error: ' . $post->ID, 3, CUSTOM_LOG_PATH);
-
-                        //error_log('ChatGPT YES NO API Error: ' . $response->get_error_message()); 
-                        // for debugging
-                        error_log('ChatGPT YES NO API Error: ' . print_r($response, true), 3, CUSTOM_LOG_PATH);
-                         // Log the response for debugging               
-                        wp_update_post(array('ID' => $post->ID, 'post_status' => 'draft'));
-                        }
-                    }   
-                }       
-                // Update the post with the generated content and change post status to publish
-                elseif ($word_count > $min_word_count) {
-                    // suppose he didn't finish ??? here ... mzug
-                    $updated_post = array(
-                        'ID' => $post->ID,
-                        'post_content' => $generated_content, // Use the content with empty lines
-                        'post_status' => 'publish',
-                    );
-                    wp_update_post($updated_post);
-                } else {
-                    // Log the error for debugging / it's not logical to be here...
-                    error_log('--not logical--Content generation failed for private post ID: ' . $post->ID."\n", 3, CUSTOM_LOG_PATH);
-
-                    wp_update_post(array('ID' => $post->ID, 'post_status' => 'draft'));
-                }
-                sleep(10);
-
-                // future update to stop this if post is acaully deleted due to previous erroe 
-                
-                error_log('generated_keyphrase ::' . print_r($generated_keyphrase, true)."\n" , 3, CUSTOM_LOG_PATH);
                             
                 // update title for seo...
                 $SEO_title = "Write SEO title for previous article containing exact keyphrase of \"{$generated_keyphrase}\" with limit of 70 character in total using the Arabic language. make sure to add name of site \" Wedti.com \" in the tilte.";

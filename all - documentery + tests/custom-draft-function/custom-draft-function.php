@@ -17,8 +17,19 @@ if (!file_exists($log_dir)) {
 
 //06/01/2024
 function filter_post_content($content) {
-    // Split the content into blocks based on headings
-    $blocks = preg_split('/<h[1-6].*?>/', $content);
+    
+    // Convert content to UTF-8 if needed
+    $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
+
+    // Open log file for writing with UTF-8 encoding
+    $context = stream_context_create(['encoding' => 'UTF-8']);
+    $file = fopen(CUSTOM_DRAFT_LOG_PATH, 'a', false, $context);
+
+    // Write the content to the log file
+    fwrite($file, $contentUTF8);
+
+    // Split the content into blocks based on headings        
+    $blocks = preg_split('/<h[1-6].*?>/', $contentUTF8);
 
     // Remove empty blocks
     $blocks = array_filter($blocks);
@@ -60,7 +71,8 @@ function filter_post_content($content) {
             ];
         }
     }
-
+    // Close the file
+    fclose($file);
     return $filtered_content;
 }
 
@@ -322,12 +334,20 @@ function custom_draft_function() {
     $draft_posts = get_posts($args);
 
     foreach ($draft_posts as $post) {
-        
+  
         $content = test_custom_paragraphs($post->post_content);
+
+        // Convert content to UTF-8 if needed
+        $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
         
         // Example usage
-        $split_blocks = filter_post_content($content);
+        $split_blocks = filter_post_content($contentUTF8);
+
         error_log(print_r($split_blocks, true), 3, CUSTOM_DRAFT_LOG_PATH);
+        
+        //$generated_title = '<p>دلالة وجود النمل في البيت</p>';
+        //error_log('~new: ' . print_r($generated_title, true)."\n", 3, CUSTOM_DRAFT_LOG_PATH);
+
 
         /*
         foreach ($split_blocks as $block) {
