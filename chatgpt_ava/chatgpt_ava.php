@@ -509,8 +509,7 @@ function chatgpt_ava_private_rewrite()
     //  and make cron job once daily to  delete all the posts in that array in database
     function count_and_manage_posts($post_id, $content)
     {
-
-        $max_char_count = 8100; // without_space
+        //$max_char_count = 8100; // without_space
         $min_word_count = 115;
         $post = get_post($post_id);
 
@@ -537,7 +536,7 @@ function chatgpt_ava_private_rewrite()
 
             // the only one thing we missing in this counting function is numbers 10 100 1000 any numbers
 
-            if ($word_count < $min_word_count || $ch_string_length > $max_char_count) {
+            if ($word_count < $min_word_count) { // || $ch_string_length > $max_char_count
                 // Update post status to draft
                 wp_update_post(array(
                     'ID' => $post_id,
@@ -545,7 +544,7 @@ function chatgpt_ava_private_rewrite()
                 ));
 
 
-                error_log('(+_+) Content is to long\Short ... '."\n", 3, CUSTOM_LOG_PATH);
+                error_log('(+_+) Content is too Short ... '."\n", 3, CUSTOM_LOG_PATH);
 
 
                 // Store the post ID in the database (add your custom table logic here)
@@ -891,7 +890,12 @@ function chatgpt_ava_private_rewrite()
                     array('role' => 'system', 'content' => 'Act like an SEO professional writer, 
                     I need an optimized blog post, you will paraphrase a given article paragraphs, you should focus
                     on readability, relevance, and proper keyword placement, please avoid keyword stuffing or
-                    over-optimization.'),
+                    over-optimization. Make sure to use keyphrase in the subheadings and use a cohesive structure 
+                    to ensure smooth transitions between ideas using enough transition words, while writing focus on 
+                    the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to 
+                    (1) enclose headings in the specified heading tags to make parsing the content easier and to 
+                    improve SEO use keyphrase in one subheadings. (2) Make sure that 25% of the sentences you write 
+                    contain less than 20 words, please keep in mind that I will give you article as parts not one shot.'),
                     array('role' => 'user', 'content' => $filtered_content),
                 ),
                 'model' => 'gpt-3.5-turbo', // Use the gpt-3.5-turbo model name here
@@ -1158,7 +1162,7 @@ function chatgpt_ava_private_rewrite()
                 foreach ($split_blocks as $item) {
                     $part = $item['content'];
                     //..old...$message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
-                    $message = "Reparaphras this {$part} of article with using {$generated_keyphrase} as the Focus keyphrase use Arabic language.  Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Make sure that 25% of the sentences you write contain less than 20 words.";
+                    $message = "Reparaphras this {$part} of article useing Arabic language with this words( {$generated_keyphrase} ) as the Focus keyphrase.";
                     // Generate content and check word count until it meets the minimum requirement
                     $generated_content = generate_content_with_min_word_count($message, $api_key);
                     sleep(12);
