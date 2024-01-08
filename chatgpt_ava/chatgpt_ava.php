@@ -447,7 +447,7 @@ function chatgpt_ava_private_rewrite()
     // this function for filtering content before sending it to chatGPT, and fixing extra array of blocks issues. 
     function filter_allowed_tags($content) {
         // Define the allowed HTML tags
-        $allowed_tags = '<h1><h2><h3><h4><h5><h6><p><img><picture><source><b><i><em><strong><a><ul><ol><li><table><tr><th><td><strong>';
+        $allowed_tags = '<h1><h2><h3><h4><h5><h6><p><img><picture><source><b><i><em><strong><a><ul><ol><li><table><tr><th><td>';
     
         // Use strip_tags to allow only the specified tags
         $contentFiltered = strip_tags($content, $allowed_tags);
@@ -455,9 +455,98 @@ function chatgpt_ava_private_rewrite()
         return $contentFiltered;
     }
 
+    // new + img stuff
+    function filter_post_content($content) {
+        // Convert content to UTF-8 if needed
+        $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
+    
+        // Open log file for writing with UTF-8 encoding
+        $context = stream_context_create(['encoding' => 'UTF-8']);
+        $file = fopen(CUSTOM_LOG_PATH, 'a', false, $context);
+    
+        // Write the content to the log file
+        fwrite($file, $contentUTF8);
+    
+        // Split the content into blocks based on headings        
+        $blocks = preg_split('/<h[1-6].*?>/', $contentUTF8);
+    
+        // Remove empty blocks
+        $blocks = array_filter($blocks);
+    
+        $filtered_content = [];
+    
+        foreach ($blocks as $index => $block) {
+            // Get the heading and its paragraph
+            preg_match('/<h[1-6].*?>(.*?)<\/h[1-6]>/s', $block, $matches);
+    
+            $blockData = [];
+    
+            if (!empty($matches[1])) {
+                // If there is a heading, include it and the paragraph
+                $heading = $matches[0];
+                $paragraph = substr($block, strlen($matches[0]));
+    
+                // Check if the total length is less than or equal to 2550 characters
+                if (strlen($heading . $paragraph) <= 2550) {
+                    $blockData = [
+                        'type' => 'heading_with_paragraph',
+                        'content' => $heading . $paragraph,
+                    ];
+                } else {
+                    // If the total length exceeds 2550 characters, add the paragraph as a separate block
+                    $blockData[] = [
+                        'type' => 'heading',
+                        'content' => $heading,
+                    ];
+    
+                    // Split the paragraph into chunks of maximum 2550 characters
+                    $paragraphChunks = str_split($paragraph, 2550);
+                    foreach ($paragraphChunks as $chunk) {
+                        $blockData[] = [
+                            'type' => 'paragraph',
+                            'content' => $chunk,
+                        ];
+                    }
+                }
+            } else {
+                // If there is no heading, include the entire paragraph as a separate block
+                $blockData = [
+                    'type' => 'paragraph',
+                    'content' => $block,
+                ];
+            }
+    
+            // Check if the block contains an image
+            $containsImage = preg_match('/<img|<picture/', $block) === 1;
+            //$blockData['containsImage'] = $containsImage;
+            //$filtered_content[] = $blockData;
+            
+            if ($containsImage) {
+                // Handle the block with an image (e.g., store it for later use)
+                // You can add your logic here to handle images separately
+                $imageBlock = [
+                    'type' => 'image',
+                    'content' => $block,
+                ];
+    
+                // Add the image block to the filtered content separately
+                $filtered_content[] = $imageBlock;
+            } else {
+                // Add the regular block to the filtered content
+                $filtered_content[] = $blockData;
+            }
+    
+        }
+    
+        // Close the file
+        fclose($file);
+    
+        return $filtered_content;
+    }
+
     //06/01/2024
     // this function responsible for cutting articles into chanks or blocks based on thier headding and paragraphs
-    function filter_post_content($content) {
+    function filter_post_content_paragraphs($content) {
         
         // Convert content to UTF-8 if needed
         $contentUTF8 = mb_convert_encoding($content, 'UTF-8', 'auto');
@@ -1176,19 +1265,29 @@ function chatgpt_ava_private_rewrite()
                 
                 $flagey = 1;
                 foreach ($split_blocks as $item) {
-                    $part = $item['content'];
-                    //..old...$message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
-                    $message = "Reparaphras this {$part} of article useing Arabic language with this words( {$generated_keyphrase} ) as the Focus keyphrase.";
-                    // Generate content and check word count until it meets the minimum requirement
-                    $generated_content = generate_content_with_min_word_count($message, $api_key);
-                    sleep(12);
+                    $blockContent = $item['content'];
+                    $containsImage = $item['containsImage'];
 
-                    $word_count = count_words($generated_content);
-                    error_log('The response for part '. $flagey . ' api word count is: ' . print_r($word_count, true)."\n", 3, CUSTOM_LOG_PATH);
-                    //error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
+                    if ($containsImage) {
+                        // Handle the block with an image
+                        // Extract the image content and insert it into the post
+                        $imageBlock = $item['content'];
+                        append_content_to_post($post->ID, $imageBlock);
+                    } else {
+                        // Handle the block without an image
+                        //..old...$message = "Reparaphras the previous article with using {$generated_keyphrase} as the Focus keyphrase, and make sure to use the exact keyphrase twice in content, covering it to become more than 320 words in total using the Arabic language. Structure the article with clear headings enclosed within the appropriate heading tags (e.g., <h1>, <h2>, etc.) and generate two subtopics inside the article to use subheadings, each one of them should have at least one paragraph. Make sure to use keyphrase in the subheadings and use a cohesive structure to ensure smooth transitions between ideas using enough transition words, while writing focus on the SEO score of Yoast and the readability score. Make it coherent and proficient. Remember to (1) enclose headings in the specified heading tags to make parsing the content easier and to improve SEO use keyphrase in one subheadings. (2) Wrap even paragraphs in <p> tags for improved readability. (3) Make sure that 25% of the sentences you write contain less than 20 words. (4) Insert an internal link to visit our site https://wedti.com and another one to follow on social media https://www.instagram.com/webwedti or facebook @webwedti";
+                        $message = "Reparaphrase this {$blockContent} of the article using the Arabic language with these words ({$generated_keyphrase}) as the focus keyphrase.";
+                        // Generate content and check word count until it meets the minimum requirement
+                        $generated_content = generate_content_with_min_word_count($message, $api_key);
+                        sleep(12);
     
-                    // Ask ChatGPT to continue generating content until it reaches the minimum word count
-                    check_response_code($word_count, $api_key, $post, $generated_content);
+                        $word_count = count_words($generated_content);
+                        error_log('The response for part '. $flagey . ' api word count is: ' . print_r($word_count, true)."\n", 3, CUSTOM_LOG_PATH);
+                        //error_log('The response contains the following words: ' . print_r(implode(', ', $found_words), true)."\n", 3, CUSTOM_LOG_PATH);
+        
+                        // Ask ChatGPT to continue generating content until it reaches the minimum word count
+                        check_response_code($word_count, $api_key, $post, $generated_content);
+                    }                    
                     $flagey += 1;
                 }
                 
