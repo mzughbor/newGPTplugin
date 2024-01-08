@@ -1261,17 +1261,26 @@ function chatgpt_ava_private_rewrite()
                 // future update to stop this if post is acaully deleted due to previous erroe                 
                 error_log('generated_keyphrase ::' . print_r($generated_keyphrase, true)."\n" , 3, CUSTOM_LOG_PATH);
 
+                // Update the post with an empty content so we freash 
+                $updated_post = array(
+                    'ID' => $post->ID,
+                    'post_content' => '',
+                );
+                wp_update_post($updated_post);
+                
                 error_log('~~~~~~~~<Content Started>~~~~~~~~~~'."\n", 3, CUSTOM_LOG_PATH);
                 
                 $flagey = 1;
                 foreach ($split_blocks as $item) {
+                    
                     $blockContent = $item['content'];
                     $containsImage = $item['containsImage'];
 
-                    if ($containsImage) {
+                    if ($item['type'] === 'image') {
+                    //if ($containsImage) {
                         // Handle the block with an image
                         // Extract the image content and insert it into the post
-                        $imageBlock = $item['content'];
+                        $imageBlock = $item['containsImage'];
                         append_content_to_post($post->ID, $imageBlock);
                     } else {
                         // Handle the block without an image
